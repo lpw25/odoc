@@ -121,14 +121,16 @@ module Html : sig
   val info: Term.info
 end = struct
 
-  let html semantic_uris closed_details _hidden directories output_dir index_for
+  let html semantic_uris closed_details elasticsearch_index _hidden directories output_dir index_for
         input_file =
     DocOckHtml.Html_tree.Relative_link.semantic_uris := semantic_uris;
     DocOckHtml.Html_tree.open_details := not closed_details;
     let env = Env.create ~important_digests:false ~directories in
     let file = Fs.File.of_string input_file in
     match index_for with
-    | None -> Html.from_odoc ~env ~output:output_dir file
+    | None ->
+      if elasticsearch_index then Index.from_odoc ~env file;
+      Html.from_odoc ~env ~output:output_dir file
     | Some pkg_name ->
       let package = Root.Package.create pkg_name in
       Html.from_mld ~env ~output:output_dir ~package file
@@ -148,6 +150,10 @@ end = struct
       in
       Arg.(value & flag (info ~doc ["closed-details"]))
     in
+    let elasticsearch_index =
+      let doc = "Generate Elasticsearch search index entries" in
+      Arg.(value & flag (info ~doc ["elasticsearch-index"]))
+    in
     let index_for =
       let doc = "DEPRECATED: you should use 'odoc compile' to process .mld \
 		 files. When this argument is given, then the input file is \
@@ -158,55 +164,11 @@ end = struct
       in
       Arg.(value & opt (some string) None @@ info ~docv:"PKG" ~doc ["index-for"])
     in
-    Term.(const html $ semantic_uris $ closed_details $ hidden $ env $ dst $
+    Term.(const html $ semantic_uris $ closed_details $ elasticsearch_index $ hidden $ env $ dst $
           index_for $ input)
 
   let info =
     Term.info ~doc:"Generates an html file from an odoc one" "html"
-end
-
-(* CR jsomers for lwhite: This defines the new "index" subcommand. Suppose we have
-   already run the "compile" command on a the doc-ock/src/docOckPaths.cmti file. Then
-   we can run "index" like so:
-
-   {v
-      $ ./odoc/bin/main.exe index ./doc-ock/src/docOckPaths.odoc
-
-      ...
-
-      odocotron1/DocOckPaths/Reference/Resolved#val-hash
-      DocOckPaths.Reference.Resolved.hash
-
-
-      ...
-
-      odocotron1/DocOckPaths/Reference/Resolved#val-identifier
-      DocOckPaths.Reference.Resolved.identifier
-      <p><code class="code">identifier rr</code> extracts the identifier present at the &quot;root&quot; of <code class="code">rr</code>.</p>
-    v}
-
-   The output is just some strings that are useful for building search index entries. They
-   contain a unit of code's "url", its path, and any associated doc comment in HTML form.
-*)
-module Index : sig
-  val cmd : unit Term.t
-  val info: Term.info
-end = struct
-
-  let index directories input_file =
-    let env = Env.create ~important_digests:false ~directories in
-    let file = Fs.File.of_string input_file in
-    Index.from_odoc ~env file
-
-  let cmd =
-    let input =
-      let doc = "Input file" in
-      Arg.(required & pos 0 (some file) None @@ info ~doc ~docv:"file.odoc" [])
-    in
-    Term.(const index $ env $ input)
-
-  let info =
-    Term.info ~doc:"Creates search index entries from an odoc file" "index"
 end
 
 module Depends = struct
@@ -352,7 +314,6 @@ let () =
   let subcommands =
     [ Compile.(cmd, info)
     ; Html.(cmd, info)
-    ; Index.(cmd, info)
     ; Css.(cmd, info)
     ; Depends.Compile.(cmd, info)
     ; Depends.Html.(cmd, info)
