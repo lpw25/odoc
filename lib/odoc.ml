@@ -8,6 +8,8 @@ module Depends = Depends
 
 module Html = Html
 
+module Index = Index
+
 (**/**)
 
 module Targets = Targets

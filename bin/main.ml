@@ -165,6 +165,50 @@ end = struct
     Term.info ~doc:"Generates an html file from an odoc one" "html"
 end
 
+(* CR jsomers for lwhite: This defines the new "index" subcommand. Suppose we have
+   already run the "compile" command on a the doc-ock/src/docOckPaths.cmti file. Then
+   we can run "index" like so:
+
+   {v
+      $ ./odoc/bin/main.exe index ./doc-ock/src/docOckPaths.odoc
+
+      ...
+
+      odocotron1/DocOckPaths/Reference/Resolved#val-hash
+      DocOckPaths.Reference.Resolved.hash
+
+
+      ...
+
+      odocotron1/DocOckPaths/Reference/Resolved#val-identifier
+      DocOckPaths.Reference.Resolved.identifier
+      <p><code class="code">identifier rr</code> extracts the identifier present at the &quot;root&quot; of <code class="code">rr</code>.</p>
+    v}
+
+   The output is just some strings that are useful for building search index entries. They
+   contain a unit of code's "url", its path, and any associated doc comment in HTML form.
+*)
+module Index : sig
+  val cmd : unit Term.t
+  val info: Term.info
+end = struct
+
+  let index directories input_file =
+    let env = Env.create ~important_digests:false ~directories in
+    let file = Fs.File.of_string input_file in
+    Index.from_odoc ~env file
+
+  let cmd =
+    let input =
+      let doc = "Input file" in
+      Arg.(required & pos 0 (some file) None @@ info ~doc ~docv:"file.odoc" [])
+    in
+    Term.(const index $ env $ input)
+
+  let info =
+    Term.info ~doc:"Creates search index entries from an odoc file" "index"
+end
+
 module Depends = struct
   module Compile = struct
     let list_dependencies input_file =
@@ -308,6 +352,7 @@ let () =
   let subcommands =
     [ Compile.(cmd, info)
     ; Html.(cmd, info)
+    ; Index.(cmd, info)
     ; Css.(cmd, info)
     ; Depends.Compile.(cmd, info)
     ; Depends.Html.(cmd, info)
