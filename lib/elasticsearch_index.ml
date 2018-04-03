@@ -65,23 +65,31 @@ let index_entry id doc =
   String.concat ~sep:"\n" [ url id; package id; name id; html_string doc ];
 ;;
 
-(* CR jsomers for lwhite: This is the workhorse function that parses
-the odoc tree recursively printing stuff out. *)
-(* [nearest_id] is for free-floating doc comments *)
+let rec print_class_signature nearest_id (class_signature : 'a DocOckTypes.ClassSignature.t) =
+  List.iter class_signature.items ~f:(fun i ->
+    match i with
+    | DocOckTypes.ClassSignature.Method m -> print_endline (index_entry m.id m.doc)
+    | InstanceVariable iv -> print_endline (index_entry iv.id iv.doc)
+    | Inherit cte -> begin
+        match cte with
+        | Constr _ -> ignore ()
+        | Signature cs -> print_class_signature nearest_id cs
+      end
+    | Comment c -> begin
+        match c with
+        | Documentation doc -> print_endline (index_entry nearest_id doc)
+        | Stop -> ignore ()
+      end
+    | _ -> ignore ()
+  )
+;;
+
+(* [nearest_id] is used to handle free-floating doc comments. *)
 let rec print_index_entries signature nearest_id =
   let open DocOckTypes.Signature in
   List.iter signature ~f:(fun i ->
     print_endline "\n...\n";
     match i with
-    | Type t -> print_endline (index_entry t.id t.doc)
-    | Comment c -> begin
-        match c with
-        | Documentation doc -> begin
-            print_endline (index_entry nearest_id doc);
-          end
-        | Stop -> print_endline ""
-      end
-    | Value v -> print_endline (index_entry v.id v.doc)
     | Module m -> begin
         print_endline (index_entry m.id m.doc);
         let expansion = match m.expansion with
@@ -95,17 +103,58 @@ let rec print_index_entries signature nearest_id =
         in
         match expansion with
         | Signature s -> print_index_entries s m.id
-        | AlreadyASig -> print_endline ""  (* CR jsomers for lwhite: Cases I didn't understand, I ignored... *)
-        | Functor _ -> print_endline "" (* TODO *)
+        (* CR jsomers for lwhite: Cases I didn't understand, I ignored... *)
+        | AlreadyASig -> ignore ()
+        | Functor _ -> ignore ()
       end
-    | _ -> print_endline "" (* CR jsomers for lwhite: What are the other cases that matter? Must we cover EVERY case? *)
+    | ModuleType mt -> print_endline (index_entry mt.id mt.doc)
+    | Type t -> print_endline (index_entry t.id t.doc)
+    | TypExt te -> begin
+        (* TODO: ignoring the toplevel doc bc it's not clear what to do with it bc there
+           is no corresponding [id]. *)
+        List.iter te.constructors ~f:(fun (c : 'a DocOckTypes.Extension.Constructor.t) ->
+          print_endline (index_entry c.id c.doc)
+        )
+      end
+    (* TODO: There seem to be expansions even of an Exception's [args] record field which
+       lead to more docs and ids. *)
+    | Exception e -> print_endline (index_entry e.id e.doc)
+    | Value v -> print_endline (index_entry v.id v.doc)
+    | External e -> print_endline (index_entry e.id e.doc)
+    | Class c -> begin
+        print_endline (index_entry c.id c.doc);
+        match c.expansion with
+          | Some cs -> print_class_signature c.id cs
+          | None -> ignore ()
+      end
+    | ClassType ct -> begin
+        print_endline (index_entry ct.id ct.doc);
+        match ct.expansion with
+        | Some cs -> print_class_signature ct.id cs
+        | None -> ignore ();
+
+        match ct.expr with
+        | Constr _ -> ignore ()
+        | Signature cs -> print_class_signature ct.id cs
+      end
+    | Include inc -> begin
+        print_endline (index_entry inc.parent inc.doc);
+        (* TODO: Not sure this [nearest_id] is right. Possibly it should be [inc.parent]
+           but that has the wrong type. *)
+        print_index_entries inc.expansion.content nearest_id;
+      end
+    | Comment c -> begin
+        match c with
+        | Documentation doc -> print_endline (index_entry nearest_id doc)
+        | Stop -> ignore ()
+      end
   );
 ;;
 
 let from_odoc ~env input =
   let root = Root.read input in
   match Root.file root with
-  | Page _ -> failwith "TODO"  (* CR jsomers for lwhite: I suppose this is where we'd handle mld files right? *)
+  | Page _ -> failwith "TODO"
   | Unit {hidden; _} ->
     let unit = Unit.load input in
     let unit = DocOckLookup.lookup unit in
@@ -119,7 +168,8 @@ let from_odoc ~env input =
     in
     print_endline (index_entry odoctree.id odoctree.doc);
     let signature = match odoctree.content with
-      | Pack _ -> failwith "TODO"  (* CR jsomers for lwhite: Not sure whether we need to handle this case. *)
+      (* CR jsomers for lwhite: Not sure whether we need to handle this case. *)
+      | Pack _ -> failwith "TODO"
       | Module s -> s
     in
     print_index_entries signature odoctree.id;
