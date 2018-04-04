@@ -1,21 +1,50 @@
 open StdLabels
+open DocOckPaths
 open DocOckHtml
 
 let get_package root = Root.Package.to_string (Root.package root)
 
-let path identifier =
-  match Url.from_identifier ~get_package ~stop_before:false identifier with
-  | Error _ -> failwith "TODO"
-  | Ok url ->
-    let name = DocOckPaths.Identifier.name identifier in
-    let components = List.tl (List.rev url.page) in
-    let components = if String.equal (String.lowercase_ascii name) name then
-        components @ [name]
-      else
-        components
-    in
-    String.concat ~sep:"." components
-;;
+let rec package : type a. (Root.t, a) Identifier.t -> string =
+  let open Identifier in function
+  | Root(root, _) -> Root.Package.to_string (Root.package root)
+  | Page(root, _) -> Root.Package.to_string (Root.package root)
+  | Module(parent, _) -> package parent
+  | Argument(parent, _, _) -> package parent
+  | ModuleType(parent, _) -> package parent
+  | Type(parent, _) -> package parent
+  | CoreType _ -> failwith "core types have no package"
+  | Constructor(parent, _) -> package parent
+  | Field(parent, _) -> package parent
+  | Extension(parent, _) -> package parent
+  | Exception(parent, _) -> package parent
+  | CoreException _ -> failwith "core exceptions have no package"
+  | Value(parent, _) -> package parent
+  | Class(parent, _) -> package parent
+  | ClassType(parent, _) -> package parent
+  | Method(parent, _) -> package parent
+  | InstanceVariable(parent, _) -> package parent
+  | Label(parent, _) -> package parent
+
+let rec name : type a. (Root.t, a) Identifier.t -> string =
+  let open Identifier in function
+  | Root(_, s) -> s
+  | Page(_, s) -> s
+  | Module(parent, s) -> name parent ^ "." ^ s
+  | Argument(parent, _, s) -> name parent ^ "." ^ s
+  | ModuleType(parent, s) -> name parent ^ "." ^ s
+  | Type(parent, s) -> name parent ^ "." ^ s
+  | CoreType s -> s
+  | Constructor(parent, s) -> name parent ^ "." ^ s
+  | Field(parent, s) -> name parent ^ "." ^ s
+  | Extension(parent, s) -> name parent ^ "." ^ s
+  | Exception(parent, s) -> name parent ^ "." ^ s
+  | CoreException s -> s
+  | Value(parent, s) -> name parent ^ "." ^ s
+  | Class(parent, s) -> name parent ^ "." ^ s
+  | ClassType(parent, s) -> name parent ^ "." ^ s
+  | Method(parent, s) -> name parent ^ "." ^ s
+  | InstanceVariable(parent, s) -> name parent ^ "." ^ s
+  | Label(parent, s) -> name parent ^ "." ^ s
 
 let url identifier =
   match Url.from_identifier ~get_package ~stop_before:false identifier with
@@ -33,7 +62,7 @@ let html_string (doc : 'a DocOckTypes.Documentation.t) =
 ;;
 
 let index_entry id doc =
-  String.concat ~sep:"\n" [ url id; path id; html_string doc ];
+  String.concat ~sep:"\n" [ url id; package id; name id; html_string doc ];
 ;;
 
 (* CR jsomers for lwhite: This is the workhorse function that parses
