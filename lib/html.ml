@@ -19,7 +19,7 @@ open DocOckHtml
 
 let get_package root = Root.Package.to_string (Root.package root)
 
-let from_odoc ~env ~output:root_dir input =
+let from_odoc ~env ~output:root_dir ~elasticsearch_index_output ~elasticsearch_index input =
   let root = Root.read input in
   match Root.file root with
   | Page page_name ->
@@ -38,6 +38,7 @@ let from_odoc ~env ~output:root_dir input =
         let f = Fs.File.create ~directory:pkg_dir ~name:(page_name ^ ".html") in
         open_out (Fs.File.to_string f)
       in
+
       let fmt = Format.formatter_of_out_channel oc in
       Format.fprintf fmt "%a" (Tyxml.Html.pp ()) content;
       close_out oc
@@ -57,9 +58,11 @@ let from_odoc ~env ~output:root_dir input =
       |> DocOckLookup.lookup
       |> DocOck.resolve (Env.resolver expand_env) (* Yes, again. *)
     in
+    if elasticsearch_index then Elasticsearch_index.from_odoc ~env ~output:elasticsearch_index_output ~odoctree input;
     let pkg_dir =
       let pkg_name = get_package root in
       Fs.Directory.reach_from ~dir:root_dir pkg_name
+
     in
     let pages = To_html_tree.unit ~get_package odoctree in
     Html_tree.traverse pages ~f:(fun ~parents name content ->

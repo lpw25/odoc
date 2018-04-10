@@ -129,9 +129,7 @@ end = struct
     let file = Fs.File.of_string input_file in
     let output = Fs.File.(set_ext ".index" file) in
     match index_for with
-    | None ->
-      if elasticsearch_index then Elasticsearch_index.from_odoc ~env ~output file;
-      Html.from_odoc ~env ~output:output_dir file
+    | None -> Html.from_odoc ~env ~output:output_dir ~elasticsearch_index_output:output ~elasticsearch_index file
     | Some pkg_name ->
       let package = Root.Package.create pkg_name in
       Html.from_mld ~env ~output:output_dir ~package file

@@ -160,23 +160,13 @@ let rec print_index_entries signature nearest_id fmt =
    - better relevance using a graph of references?
 *)
 
-let from_odoc ~env ~output input =
+let from_odoc ~env ~output ~(odoctree:'a DocOck.Types.Unit.t) input =
   let root = Root.read input in
   match Root.file root with
   | Page _ -> failwith "TODO"
   | Unit {hidden; _} ->
     if (not hidden) then
       begin
-        let unit = Unit.load input in
-        let unit = DocOckLookup.lookup unit in
-        let odoctree =
-          let resolve_env = Env.build env (`Unit unit) in
-          let resolved = DocOck.resolve (Env.resolver resolve_env) unit in
-          let expand_env = Env.build env (`Unit resolved) in
-          DocOck.expand (Env.expander expand_env) resolved
-          |> DocOckLookup.lookup
-          |> DocOck.resolve (Env.resolver expand_env)
-        in
         let oc = open_out (Fs.File.to_string output) in
         let fmt = Format.formatter_of_out_channel oc in
         Format.fprintf fmt "%s" (index_entry odoctree.id odoctree.doc);
