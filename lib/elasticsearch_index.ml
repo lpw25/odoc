@@ -65,19 +65,19 @@ let index_entry id doc =
   String.concat ~sep:"\n" [ url id; package id; name id; html_string doc ];
 ;;
 
-let rec print_class_signature nearest_id (class_signature : 'a DocOckTypes.ClassSignature.t) =
+let rec print_class_signature nearest_id (class_signature : 'a DocOckTypes.ClassSignature.t) fmt =
   List.iter class_signature.items ~f:(fun i ->
     match i with
-    | DocOckTypes.ClassSignature.Method m -> print_endline (index_entry m.id m.doc)
-    | InstanceVariable iv -> print_endline (index_entry iv.id iv.doc)
+    | DocOckTypes.ClassSignature.Method m -> Format.fprintf fmt "%s" (index_entry m.id m.doc)
+    | InstanceVariable iv -> Format.fprintf fmt "%s" (index_entry iv.id iv.doc)
     | Inherit cte -> begin
         match cte with
         | Constr _ -> ignore ()
-        | Signature cs -> print_class_signature nearest_id cs
+        | Signature cs -> print_class_signature nearest_id cs fmt
       end
     | Comment c -> begin
         match c with
-        | Documentation doc -> print_endline (index_entry nearest_id doc)
+        | Documentation doc -> Format.fprintf fmt "%s" (index_entry nearest_id doc)
         | Stop -> ignore ()
       end
     | _ -> ignore ()
@@ -85,13 +85,15 @@ let rec print_class_signature nearest_id (class_signature : 'a DocOckTypes.Class
 ;;
 
 (* [nearest_id] is used to handle free-floating doc comments. *)
-let rec print_index_entries signature nearest_id =
+let rec print_index_entries signature nearest_id fmt =
+  (* TODO: file path is basically probably the top-level signature and id here. *)
   let open DocOckTypes.Signature in
   List.iter signature ~f:(fun i ->
-    print_endline "\n...\n";
+    let dots = "\n...\n" in
+    Format.fprintf fmt "%s" dots;
     match i with
     | Module m -> begin
-        print_endline (index_entry m.id m.doc);
+        Format.fprintf fmt "%s" (index_entry m.id m.doc);
         let expansion = match m.expansion with
           | Some AlreadyASig ->
             begin match m.type_ with
@@ -102,75 +104,90 @@ let rec print_index_entries signature nearest_id =
           | None -> AlreadyASig
         in
         match expansion with
-        | Signature s -> print_index_entries s m.id
+
+        | Signature s -> print_index_entries s m.id fmt
         (* CR jsomers for lwhite: Cases I didn't understand, I ignored... *)
         | AlreadyASig -> ignore ()
         | Functor _ -> ignore ()
       end
-    | ModuleType mt -> print_endline (index_entry mt.id mt.doc)
-    | Type t -> print_endline (index_entry t.id t.doc)
+    | ModuleType mt -> Format.fprintf fmt "%s" (index_entry mt.id mt.doc);
+    | Type t -> Format.fprintf fmt "%s" (index_entry t.id t.doc);
     | TypExt te -> begin
         (* TODO: ignoring the toplevel doc bc it's not clear what to do with it bc there
            is no corresponding [id]. *)
         List.iter te.constructors ~f:(fun (c : 'a DocOckTypes.Extension.Constructor.t) ->
-          print_endline (index_entry c.id c.doc)
+          Format.fprintf fmt "%s" (index_entry c.id c.doc);
         )
       end
     (* TODO: There seem to be expansions even of an Exception's [args] record field which
        lead to more docs and ids. *)
-    | Exception e -> print_endline (index_entry e.id e.doc)
-    | Value v -> print_endline (index_entry v.id v.doc)
-    | External e -> print_endline (index_entry e.id e.doc)
+    | Exception e -> Format.fprintf fmt "%s" (index_entry e.id e.doc);
+    | Value v -> Format.fprintf fmt "%s" (index_entry v.id v.doc);
+    | External e -> Format.fprintf fmt "%s" (index_entry e.id e.doc);
     | Class c -> begin
-        print_endline (index_entry c.id c.doc);
+        Format.fprintf fmt "%s" (index_entry c.id c.doc);
         match c.expansion with
-          | Some cs -> print_class_signature c.id cs
+          | Some cs -> print_class_signature c.id cs fmt
           | None -> ignore ()
       end
     | ClassType ct -> begin
-        print_endline (index_entry ct.id ct.doc);
+        Format.fprintf fmt "%s" (index_entry ct.id ct.doc);
         match ct.expansion with
-        | Some cs -> print_class_signature ct.id cs
+        | Some cs -> print_class_signature ct.id cs fmt
         | None -> ignore ();
 
         match ct.expr with
         | Constr _ -> ignore ()
-        | Signature cs -> print_class_signature ct.id cs
+        | Signature cs -> print_class_signature ct.id cs fmt
       end
     | Include inc -> begin
-        print_endline (index_entry inc.parent inc.doc);
+        Format.fprintf fmt "%s" (index_entry inc.parent inc.doc);
         (* TODO: Not sure this [nearest_id] is right. Possibly it should be [inc.parent]
            but that has the wrong type. *)
-        print_index_entries inc.expansion.content nearest_id;
+        print_index_entries inc.expansion.content nearest_id fmt;
       end
     | Comment c -> begin
         match c with
-        | Documentation doc -> print_endline (index_entry nearest_id doc)
+        | Documentation doc -> Format.fprintf fmt "%s" (index_entry nearest_id doc)
         | Stop -> ignore ()
       end
   );
 ;;
 
-let from_odoc ~env input =
+(*
+   - build the tree once instead of twice
+   - get the whole path not just the last part
+   - better relevance using a graph of references?
+*)
+
+let from_odoc ~env ~output input =
   let root = Root.read input in
   match Root.file root with
   | Page _ -> failwith "TODO"
   | Unit {hidden; _} ->
-    let unit = Unit.load input in
-    let unit = DocOckLookup.lookup unit in
-    let odoctree =
-      let resolve_env = Env.build env (`Unit unit) in
-      let resolved = DocOck.resolve (Env.resolver resolve_env) unit in
-      let expand_env = Env.build env (`Unit resolved) in
-      DocOck.expand (Env.expander expand_env) resolved
-      |> DocOckLookup.lookup
-      |> DocOck.resolve (Env.resolver expand_env)
-    in
-    print_endline (index_entry odoctree.id odoctree.doc);
-    let signature = match odoctree.content with
-      (* CR jsomers for lwhite: Not sure whether we need to handle this case. *)
-      | Pack _ -> failwith "TODO"
-      | Module s -> s
-    in
-    print_index_entries signature odoctree.id;
+    if (not hidden) then
+      begin
+        let unit = Unit.load input in
+        let unit = DocOckLookup.lookup unit in
+        let odoctree =
+          let resolve_env = Env.build env (`Unit unit) in
+          let resolved = DocOck.resolve (Env.resolver resolve_env) unit in
+          let expand_env = Env.build env (`Unit resolved) in
+          DocOck.expand (Env.expander expand_env) resolved
+          |> DocOckLookup.lookup
+          |> DocOck.resolve (Env.resolver expand_env)
+        in
+        let oc = open_out (Fs.File.to_string output) in
+        let fmt = Format.formatter_of_out_channel oc in
+        Format.fprintf fmt "%s" (index_entry odoctree.id odoctree.doc);
+        let signature = match odoctree.content with
+          (* CR jsomers for lwhite: Not sure whether we need to handle this case. *)
+          | Pack _ -> failwith "TODO"
+          | Module s -> s
+        in
+        print_index_entries signature odoctree.id fmt;
+        close_out oc;
+      end
+    else
+      ()
 ;;

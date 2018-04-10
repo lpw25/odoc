@@ -127,9 +127,10 @@ end = struct
     DocOckHtml.Html_tree.open_details := not closed_details;
     let env = Env.create ~important_digests:false ~directories in
     let file = Fs.File.of_string input_file in
+    let output = Fs.File.(set_ext ".index" file) in
     match index_for with
     | None ->
-      if elasticsearch_index then Elasticsearch_index.from_odoc ~env file;
+      if elasticsearch_index then Elasticsearch_index.from_odoc ~env ~output file;
       Html.from_odoc ~env ~output:output_dir file
     | Some pkg_name ->
       let package = Root.Package.create pkg_name in
