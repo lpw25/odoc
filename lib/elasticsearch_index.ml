@@ -104,11 +104,9 @@ let rec print_index_entries signature nearest_id fmt =
           | None -> AlreadyASig
         in
         match expansion with
-
         | Signature s -> print_index_entries s m.id fmt
-        (* CR jsomers for lwhite: Cases I didn't understand, I ignored... *)
         | AlreadyASig -> ignore ()
-        | Functor _ -> ignore ()
+        | Functor (_, si) -> print_index_entries si m.id fmt
       end
     | ModuleType mt -> Format.fprintf fmt "%s" (index_entry mt.id mt.doc);
     | Type t -> Format.fprintf fmt "%s" (index_entry t.id t.doc);
@@ -153,12 +151,6 @@ let rec print_index_entries signature nearest_id fmt =
       end
   );
 ;;
-
-(*
-   - build the tree once instead of twice
-   - get the whole path not just the last part
-   - better relevance using a graph of references?
-*)
 
 let from_odoc ~env ~output ~(odoctree:'a DocOck.Types.Unit.t) input =
   let root = Root.read input in
