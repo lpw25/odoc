@@ -20,4 +20,4 @@ val from_odoc :
   env:Env.builder -> output:Fs.Directory.t -> elasticsearch_index_output:Fs.File.t -> elasticsearch_index:bool -> Fs.File.t -> unit
 
 val from_mld : env:Env.builder -> package:Root.Package.t ->
-  output:Fs.Directory.t -> Fs.File.t -> unit
+  output:Fs.Directory.t -> elasticsearch_index_output:Fs.File.t -> elasticsearch_index:bool -> Fs.File.t -> unit

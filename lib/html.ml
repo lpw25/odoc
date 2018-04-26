@@ -85,7 +85,7 @@ let from_odoc ~env ~output:root_dir ~elasticsearch_index_output ~elasticsearch_i
 
 (* Used only for [--index-for] which is deprecated and available only for
    backward compatibility. It should be removed whenever. *)
-let from_mld ~env ~package ~output:root_dir input =
+let from_mld ~env ~package ~output:root_dir ~elasticsearch_index_output ~elasticsearch_index input =
   let root_name =
     Filename.chop_extension (Fs.File.(to_string @@ basename input))
   in
@@ -118,6 +118,7 @@ let from_mld ~env ~package ~output:root_dir input =
     in
     (* This is a mess. *)
     let page = DocOck.Types.Page.{ name; content; digest } in
+    if elasticsearch_index then Elasticsearch_index.from_mld ~env ~output:elasticsearch_index_output ~content ~page;
     let page = DocOckLookup.lookup_page page in
     let env = Env.build env (`Page page) in
     let resolved = DocOck.resolve_page (Env.resolver env) page in

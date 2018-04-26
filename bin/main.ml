@@ -132,7 +132,9 @@ end = struct
     | None -> Html.from_odoc ~env ~output:output_dir ~elasticsearch_index_output:output ~elasticsearch_index file
     | Some pkg_name ->
       let package = Root.Package.create pkg_name in
-      Html.from_mld ~env ~output:output_dir ~package file
+      let output = (Fs.File.set_ext ".index" (Fs.File.create ~directory:(Fs.File.dirname file) ~name:"index")) in
+      let output = (Fs.File.of_string (Str.replace_first (Str.regexp "") "" (("../.odoc/" ^ Fs.File.to_string output)))) in
+      Html.from_mld ~env ~output:output_dir ~package ~elasticsearch_index_output:output ~elasticsearch_index file
 
   let cmd =
     let input =

@@ -13,4 +13,4 @@
  ((name main)
   (public_name odoc)
   (flags (:standard -open StdLabels))
-  (libraries (odoc cmdliner))))
+  (libraries (odoc cmdliner str))))
