@@ -178,7 +178,9 @@ let from_odoc ~env ~output ~(odoctree:'a DocOck.Types.Unit.t) input =
 let from_mld ~env ~output ~(content:'a DocOck.Types.Documentation.t) ~(page:'a DocOck.Types.Page.t) =
   let oc = open_out (Fs.File.to_string output) in
   let fmt = Format.formatter_of_out_channel oc in
-  let id = page.name in  (* FIXME: Fix the name/URL that we print at the top of this. *)
-  Format.fprintf fmt "%s" (index_entry id content);
+  let id = page.name in
+  let meta = index_entry id content in
+  let meta = (Str.replace_first (Str.regexp "\\/.*?\\.html#") "/index.html" meta) in
+  Format.fprintf fmt "%s" meta;
   close_out oc;
 ;;
