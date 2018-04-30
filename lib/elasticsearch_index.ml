@@ -25,26 +25,26 @@ let rec package : type a. (Root.t, a) Identifier.t -> string =
   | InstanceVariable(parent, _) -> package parent
   | Label(parent, _) -> package parent
 
-let rec name : type a. (Root.t, a) Identifier.t -> string =
+let rec full_name : type a. (Root.t, a) Identifier.t -> string =
   let open Identifier in function
-  | Root(_, s) -> s
-  | Page(_, s) -> s
-  | Module(parent, s) -> name parent ^ "." ^ s
-  | Argument(parent, _, s) -> name parent ^ "." ^ s
-  | ModuleType(parent, s) -> name parent ^ "." ^ s
-  | Type(parent, s) -> name parent ^ "." ^ s
+  | Root(root, s) -> (Root.Package.to_string (Root.package root)) ^ "." ^ s
+  | Page(root, s) -> (Root.Package.to_string (Root.package root)) ^ "." ^ s
+  | Module(parent, s) -> full_name parent ^ "." ^ s
+  | Argument(parent, _, s) -> full_name parent ^ "." ^ s
+  | ModuleType(parent, s) -> full_name parent ^ "." ^ s
+  | Type(parent, s) -> full_name parent ^ "." ^ s
   | CoreType s -> s
-  | Constructor(parent, s) -> name parent ^ "." ^ s
-  | Field(parent, s) -> name parent ^ "." ^ s
-  | Extension(parent, s) -> name parent ^ "." ^ s
-  | Exception(parent, s) -> name parent ^ "." ^ s
+  | Constructor(parent, s) -> full_name parent ^ "." ^ s
+  | Field(parent, s) -> full_name parent ^ "." ^ s
+  | Extension(parent, s) -> full_name parent ^ "." ^ s
+  | Exception(parent, s) -> full_name parent ^ "." ^ s
   | CoreException s -> s
-  | Value(parent, s) -> name parent ^ "." ^ s
-  | Class(parent, s) -> name parent ^ "." ^ s
-  | ClassType(parent, s) -> name parent ^ "." ^ s
-  | Method(parent, s) -> name parent ^ "." ^ s
-  | InstanceVariable(parent, s) -> name parent ^ "." ^ s
-  | Label(parent, s) -> name parent ^ "." ^ s
+  | Value(parent, s) -> full_name parent ^ "." ^ s
+  | Class(parent, s) -> full_name parent ^ "." ^ s
+  | ClassType(parent, s) -> full_name parent ^ "." ^ s
+  | Method(parent, s) -> full_name parent ^ "." ^ s
+  | InstanceVariable(parent, s) -> full_name parent ^ "." ^ s
+  | Label(parent, s) -> full_name parent ^ "." ^ s
 
 let url identifier =
   match Url.from_identifier ~get_package ~stop_before:false identifier with
@@ -62,7 +62,7 @@ let html_string (doc : 'a DocOckTypes.Documentation.t) =
 ;;
 
 let index_entry id doc =
-  String.concat ~sep:"\n" [ url id; package id; name id; html_string doc ];
+  String.concat ~sep:"\n" [ url id; package id; full_name id; html_string doc ];
 ;;
 
 let rec print_class_signature nearest_id (class_signature : 'a DocOckTypes.ClassSignature.t) fmt =
