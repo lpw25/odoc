@@ -84,9 +84,7 @@ let rec print_class_signature nearest_id (class_signature : 'a DocOckTypes.Class
   )
 ;;
 
-(* [nearest_id] is used to handle free-floating doc comments. *)
 let rec print_index_entries signature nearest_id fmt =
-  (* TODO: file path is basically probably the top-level signature and id here. *)
   let open DocOckTypes.Signature in
   List.iter signature ~f:(fun i ->
     let dots = "\n...\n" in
@@ -111,15 +109,21 @@ let rec print_index_entries signature nearest_id fmt =
     | ModuleType mt -> Format.fprintf fmt "%s" (index_entry mt.id mt.doc);
     | Type t -> Format.fprintf fmt "%s" (index_entry t.id t.doc);
     | TypExt te -> begin
-        (* TODO: ignoring the toplevel doc bc it's not clear what to do with it bc there
-           is no corresponding [id]. *)
         List.iter te.constructors ~f:(fun (c : 'a DocOckTypes.Extension.Constructor.t) ->
           Format.fprintf fmt "%s" (index_entry c.id c.doc);
         )
       end
-    (* TODO: There seem to be expansions even of an Exception's [args] record field which
-       lead to more docs and ids. *)
-    | Exception e -> Format.fprintf fmt "%s" (index_entry e.id e.doc);
+    | Exception e ->
+      begin
+        Format.fprintf fmt "%s" (index_entry e.id e.doc);
+        match e.args with
+        | Tuple _ -> ignore ()
+        | Record field_list -> begin
+            List.iter field_list ~f:(fun (fld : 'a DocOckTypes.TypeDecl.Field.t) ->
+              Format.fprintf fmt "%s" (index_entry fld.id fld.doc);
+            )
+          end
+      end
     | Value v -> Format.fprintf fmt "%s" (index_entry v.id v.doc);
     | External e -> Format.fprintf fmt "%s" (index_entry e.id e.doc);
     | Class c -> begin
@@ -140,8 +144,6 @@ let rec print_index_entries signature nearest_id fmt =
       end
     | Include inc -> begin
         Format.fprintf fmt "%s" (index_entry inc.parent inc.doc);
-        (* TODO: Not sure this [nearest_id] is right. Possibly it should be [inc.parent]
-           but that has the wrong type. *)
         print_index_entries inc.expansion.content nearest_id fmt;
       end
     | Comment c -> begin
@@ -163,7 +165,6 @@ let from_odoc ~env ~output ~(odoctree:'a DocOck.Types.Unit.t) input =
         let fmt = Format.formatter_of_out_channel oc in
         Format.fprintf fmt "%s" (index_entry odoctree.id odoctree.doc);
         let signature = match odoctree.content with
-          (* CR jsomers for lwhite: Not sure whether we need to handle this case. *)
           | Pack _ -> failwith "TODO"
           | Module s -> s
         in
