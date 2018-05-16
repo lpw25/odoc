@@ -14,12 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-(** Produces .html files from a .odoc file. *)
+val from_unit : output:Fs.File.t -> unit:Root.t DocOck.Types.Unit.t -> unit
 
-val from_odoc :
-  env:Env.builder -> output:Fs.Directory.t
-  -> search_index:bool -> Fs.File.t -> unit
+val from_page : output:Fs.File.t -> page:Root.t DocOck.Types.Page.t -> unit
 
-val from_mld :
-  env:Env.builder -> package:Root.Package.t -> output:Fs.Directory.t
-  -> search_index:bool -> Fs.File.t -> unit
+(* Only used for [--index-for]. Delete when that is removed. *)
+val from_mld : output:Fs.File.t -> page:Root.t DocOck.Types.Page.t -> unit

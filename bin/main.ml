@@ -99,7 +99,8 @@ end = struct
       let doc = "Try resolving forward references" in
       Arg.(value & flag @@ info ~doc ["r";"resolve-fwd-refs"])
     in
-    Term.(const compile $ hidden $ env $ resolve_fwd_refs $ dst_file $ pkg $ input)
+    Term.(const compile $ hidden $ env
+          $ resolve_fwd_refs $ dst_file $ pkg $ input)
 
   let info =
     Term.info ~doc:"Compile a .cmt[i] file to a .odoc file." "compile"
@@ -121,20 +122,18 @@ module Html : sig
   val info: Term.info
 end = struct
 
-  let html semantic_uris closed_details elasticsearch_index _hidden directories output_dir index_for
-        input_file =
+  let html semantic_uris closed_details search_index
+        _hidden directories output_dir index_for input_file =
     DocOckHtml.Html_tree.Relative_link.semantic_uris := semantic_uris;
     DocOckHtml.Html_tree.open_details := not closed_details;
     let env = Env.create ~important_digests:false ~directories in
     let file = Fs.File.of_string input_file in
-    let output = Fs.File.(set_ext ".index" file) in
     match index_for with
-    | None -> Html.from_odoc ~env ~output:output_dir ~elasticsearch_index_output:output ~elasticsearch_index file
+    | None ->
+      Html.from_odoc ~env ~output:output_dir ~search_index file
     | Some pkg_name ->
       let package = Root.Package.create pkg_name in
-      let output = (Fs.File.set_ext ".index" (Fs.File.create ~directory:(Fs.File.dirname file) ~name:"index")) in
-      let output = (Fs.File.of_string (Str.replace_first (Str.regexp "") "" (("../.odoc/" ^ Fs.File.to_string output)))) in
-      Html.from_mld ~env ~output:output_dir ~package ~elasticsearch_index_output:output ~elasticsearch_index file
+      Html.from_mld ~env ~output:output_dir ~package ~search_index file
 
   let cmd =
     let input =
@@ -146,14 +145,15 @@ end = struct
       Arg.(value & flag (info ~doc ["semantic-uris";"pretty-uris"]))
     in
     let closed_details =
-      let doc = "If this flag is passed <details> tags (used for includes) will \
-                 be closed by default."
+      let doc =
+        "If this flag is passed <details> tags (used for includes) will \
+         be closed by default."
       in
       Arg.(value & flag (info ~doc ["closed-details"]))
     in
-    let elasticsearch_index =
-      let doc = "Generate Elasticsearch search index entries" in
-      Arg.(value & flag (info ~doc ["elasticsearch-index"]))
+    let search_index =
+      let doc = "Generate search index entries" in
+      Arg.(value & flag (info ~doc ["search-index"]))
     in
     let index_for =
       let doc = "DEPRECATED: you should use 'odoc compile' to process .mld \
@@ -163,10 +163,12 @@ end = struct
                  PKG is using to correctly resolve and link references inside \
 		 the input file"
       in
-      Arg.(value & opt (some string) None @@ info ~docv:"PKG" ~doc ["index-for"])
+      Arg.(value & opt (some string) None
+           @@ info ~docv:"PKG" ~doc ["index-for"])
     in
-    Term.(const html $ semantic_uris $ closed_details $ elasticsearch_index $ hidden $ env $ dst $
-          index_for $ input)
+    Term.(const html $ semantic_uris $ closed_details
+          $ search_index $ hidden $ env $ dst
+          $ index_for $ input)
 
   let info =
     Term.info ~doc:"Generates an html file from an odoc one" "html"
@@ -186,7 +188,8 @@ module Depends = struct
   let cmd =
     let input =
       let doc = "Input file" in
-      Arg.(required & pos 0 (some file) None @@ info ~doc ~docv:"file.cm{i,t,ti}" [])
+      Arg.(required & pos 0 (some file) None
+           @@ info ~doc ~docv:"file.cm{i,t,ti}" [])
     in
     Term.(const list_dependencies $ input)
 
@@ -235,7 +238,8 @@ module Targets = struct
     let cmd =
       let input =
         let doc = "Input file" in
-        Arg.(required & pos 0 (some file) None @@ info ~doc ~docv:"file.cm{i,t,ti}" [])
+        Arg.(required & pos 0 (some file) None
+             @@ info ~doc ~docv:"file.cm{i,t,ti}" [])
       in
       Term.(const list_targets $ dst $ input)
 
@@ -256,7 +260,8 @@ module Targets = struct
     let cmd =
       let input =
         let doc = "Input file" in
-        Arg.(required & pos 0 (some file) None @@ info ~doc ~docv:"file.odoc" [])
+        Arg.(required & pos 0 (some file) None
+             @@ info ~doc ~docv:"file.odoc" [])
       in
       Term.(const list_targets $ env $ dst $ input)
 

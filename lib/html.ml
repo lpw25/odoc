@@ -19,7 +19,7 @@ open DocOckHtml
 
 let get_package root = Root.Package.to_string (Root.package root)
 
-let from_odoc ~env ~output:root_dir ~elasticsearch_index_output ~elasticsearch_index input =
+let from_odoc ~env ~output:root_dir ~search_index input =
   let root = Root.read input in
   match Root.file root with
   | Page page_name ->
@@ -32,13 +32,18 @@ let from_odoc ~env ~output:root_dir ~elasticsearch_index_output ~elasticsearch_i
     let pages = To_html_tree.page ~get_package odoctree in
     let pkg_dir = Fs.Directory.reach_from ~dir:root_dir pkg_name in
     Fs.Directory.mkdir_p pkg_dir;
+    if search_index then begin
+      let search_index_output =
+        Fs.File.create ~directory:pkg_dir ~name:(page_name ^ ".index")
+      in
+      Search_index.from_page ~output:search_index_output ~page:odoctree
+    end;
     Html_tree.traverse pages ~f:(fun ~parents _pkg_name content ->
       assert (parents = []);
       let oc =
         let f = Fs.File.create ~directory:pkg_dir ~name:(page_name ^ ".html") in
         open_out (Fs.File.to_string f)
       in
-
       let fmt = Format.formatter_of_out_channel oc in
       Format.fprintf fmt "%a" (Tyxml.Html.pp ()) content;
       close_out oc
@@ -58,13 +63,17 @@ let from_odoc ~env ~output:root_dir ~elasticsearch_index_output ~elasticsearch_i
       |> DocOckLookup.lookup
       |> DocOck.resolve (Env.resolver expand_env) (* Yes, again. *)
     in
-    if elasticsearch_index then Elasticsearch_index.from_odoc ~env ~output:elasticsearch_index_output ~odoctree input;
     let pkg_dir =
       let pkg_name = get_package root in
       Fs.Directory.reach_from ~dir:root_dir pkg_name
-
     in
     let pages = To_html_tree.unit ~get_package odoctree in
+    if search_index && not hidden then begin
+      let search_index_output =
+        Fs.File.create ~directory:pkg_dir ~name:(pages.name ^ ".index")
+      in
+      Search_index.from_unit ~output:search_index_output ~unit:odoctree
+    end;
     Html_tree.traverse pages ~f:(fun ~parents name content ->
       let directory =
         let dir =
@@ -85,7 +94,7 @@ let from_odoc ~env ~output:root_dir ~elasticsearch_index_output ~elasticsearch_i
 
 (* Used only for [--index-for] which is deprecated and available only for
    backward compatibility. It should be removed whenever. *)
-let from_mld ~env ~package ~output:root_dir ~elasticsearch_index_output ~elasticsearch_index input =
+let from_mld ~env ~package ~output:root_dir ~search_index input =
   let root_name =
     Filename.chop_extension (Fs.File.(to_string @@ basename input))
   in
@@ -118,7 +127,6 @@ let from_mld ~env ~package ~output:root_dir ~elasticsearch_index_output ~elastic
     in
     (* This is a mess. *)
     let page = DocOck.Types.Page.{ name; content; digest } in
-    if elasticsearch_index then Elasticsearch_index.from_mld ~env ~output:elasticsearch_index_output ~content ~page;
     let page = DocOckLookup.lookup_page page in
     let env = Env.build env (`Page page) in
     let resolved = DocOck.resolve_page (Env.resolver env) page in
@@ -126,6 +134,12 @@ let from_mld ~env ~package ~output:root_dir ~elasticsearch_index_output ~elastic
     let pkg_name = get_package root in
     let pkg_dir = Fs.Directory.reach_from ~dir:root_dir pkg_name in
     Fs.Directory.mkdir_p pkg_dir;
+    if search_index then begin
+      let search_index_output =
+        Fs.File.create ~directory:pkg_dir ~name:"index.index"
+      in
+      Search_index.from_mld ~output:search_index_output ~page
+    end;
     Html_tree.traverse pages ~f:(fun ~parents _pkg_name content ->
       assert (parents = []);
       let oc =

@@ -50,7 +50,6 @@ let url identifier =
   match Url.from_identifier ~get_package ~stop_before:false identifier with
   | Error _ -> failwith "TODO"
   | Ok url -> Url.to_string url
-;;
 
 let html_string (doc : 'a DocOckTypes.Documentation.t) =
   let html = (Documentation.to_html ~get_package doc) in
@@ -59,17 +58,23 @@ let html_string (doc : 'a DocOckTypes.Documentation.t) =
   )
   in
   String.concat lst ~sep:"\n"
-;;
 
 let index_entry id doc =
-  String.concat ~sep:"\n" [ url id; package id; full_name id; html_string doc ];
-;;
+  String.concat ~sep:"\n" [ url id; package id; full_name id; html_string doc ]
 
-let rec print_class_signature nearest_id (class_signature : 'a DocOckTypes.ClassSignature.t) fmt =
+let mld_index_entry id doc =
+  let package = package id in
+  let url = package ^ "/index.html" in
+  String.concat ~sep:"\n" [ url; package; full_name id; html_string doc ]
+
+let rec print_class_signature nearest_id
+          (class_signature : 'a DocOckTypes.ClassSignature.t) fmt =
   List.iter class_signature.items ~f:(fun i ->
     match i with
-    | DocOckTypes.ClassSignature.Method m -> Format.fprintf fmt "%s" (index_entry m.id m.doc)
-    | InstanceVariable iv -> Format.fprintf fmt "%s" (index_entry iv.id iv.doc)
+    | DocOckTypes.ClassSignature.Method m ->
+        Format.fprintf fmt "%s" (index_entry m.id m.doc)
+    | InstanceVariable iv ->
+        Format.fprintf fmt "%s" (index_entry iv.id iv.doc)
     | Inherit cte -> begin
         match cte with
         | Constr _ -> ignore ()
@@ -82,7 +87,6 @@ let rec print_class_signature nearest_id (class_signature : 'a DocOckTypes.Class
       end
     | _ -> ignore ()
   )
-;;
 
 let rec print_index_entries signature nearest_id fmt =
   let open DocOckTypes.Signature in
@@ -95,7 +99,8 @@ let rec print_index_entries signature nearest_id fmt =
         let expansion = match m.expansion with
           | Some AlreadyASig ->
             begin match m.type_ with
-            | ModuleType (DocOckTypes.ModuleType.Signature sg) -> DocOckTypes.Module.Signature sg
+            | ModuleType (DocOckTypes.ModuleType.Signature sg) ->
+                DocOckTypes.Module.Signature sg
             | _ -> failwith "TODO"
             end
           | Some e -> e
@@ -109,9 +114,10 @@ let rec print_index_entries signature nearest_id fmt =
     | ModuleType mt -> Format.fprintf fmt "%s" (index_entry mt.id mt.doc);
     | Type t -> Format.fprintf fmt "%s" (index_entry t.id t.doc);
     | TypExt te -> begin
-        List.iter te.constructors ~f:(fun (c : 'a DocOckTypes.Extension.Constructor.t) ->
-          Format.fprintf fmt "%s" (index_entry c.id c.doc);
-        )
+        List.iter te.constructors
+          ~f:(fun (c : 'a DocOckTypes.Extension.Constructor.t) ->
+            Format.fprintf fmt "%s" (index_entry c.id c.doc);
+          )
       end
     | Exception e ->
       begin
@@ -119,9 +125,10 @@ let rec print_index_entries signature nearest_id fmt =
         match e.args with
         | Tuple _ -> ignore ()
         | Record field_list -> begin
-            List.iter field_list ~f:(fun (fld : 'a DocOckTypes.TypeDecl.Field.t) ->
-              Format.fprintf fmt "%s" (index_entry fld.id fld.doc);
-            )
+            List.iter field_list
+              ~f:(fun (fld : 'a DocOckTypes.TypeDecl.Field.t) ->
+                Format.fprintf fmt "%s" (index_entry fld.id fld.doc)
+              )
           end
       end
     | Value v -> Format.fprintf fmt "%s" (index_entry v.id v.doc);
@@ -134,10 +141,10 @@ let rec print_index_entries signature nearest_id fmt =
       end
     | ClassType ct -> begin
         Format.fprintf fmt "%s" (index_entry ct.id ct.doc);
-        match ct.expansion with
+        begin match ct.expansion with
         | Some cs -> print_class_signature ct.id cs fmt
-        | None -> ignore ();
-
+        | None -> ignore ()
+        end; (* TODO: What's this? *)
         match ct.expr with
         | Constr _ -> ignore ()
         | Signature cs -> print_class_signature ct.id cs fmt
@@ -148,39 +155,36 @@ let rec print_index_entries signature nearest_id fmt =
       end
     | Comment c -> begin
         match c with
-        | Documentation doc -> Format.fprintf fmt "%s" (index_entry nearest_id doc)
+        | Documentation doc ->
+            Format.fprintf fmt "%s" (index_entry nearest_id doc)
         | Stop -> ignore ()
       end
-  );
-;;
+  )
 
-let from_odoc ~env ~output ~(odoctree:'a DocOck.Types.Unit.t) input =
-  let root = Root.read input in
-  match Root.file root with
-  | Page _ -> failwith "TODO"
-  | Unit {hidden; _} ->
-    if (not hidden) then
-      begin
-        let oc = open_out (Fs.File.to_string output) in
-        let fmt = Format.formatter_of_out_channel oc in
-        Format.fprintf fmt "%s" (index_entry odoctree.id odoctree.doc);
-        let signature = match odoctree.content with
-          | Pack _ -> failwith "TODO"
-          | Module s -> s
-        in
-        print_index_entries signature odoctree.id fmt;
-        close_out oc;
-      end
-    else
-      ()
-;;
-
-let from_mld ~env ~output ~(content:'a DocOck.Types.Documentation.t) ~(page:'a DocOck.Types.Page.t) =
+let from_unit ~output ~(unit:'a DocOck.Types.Unit.t) =
   let oc = open_out (Fs.File.to_string output) in
   let fmt = Format.formatter_of_out_channel oc in
-  let id = page.name in
-  let meta = index_entry id content in
-  let meta = (Str.replace_first (Str.regexp "\\/.*?\\.html#") "/index.html" meta) in
-  Format.fprintf fmt "%s" meta;
+  let entry = index_entry unit.id unit.doc in
+  Format.fprintf fmt "%s" entry;
+  let signature =
+    match unit.content with
+    | Pack _ -> failwith "TODO"
+    | Module s -> s
+  in
+  print_index_entries signature unit.id fmt;
+  close_out oc
+
+let from_page ~output ~(page:'a DocOck.Types.Page.t) =
+  let oc = open_out (Fs.File.to_string output) in
+  let fmt = Format.formatter_of_out_channel oc in
+  let entry = index_entry page.name page.content in
+  Format.fprintf fmt "%s" entry;
+  close_out oc
+
+let from_mld ~output ~(page:'a DocOck.Types.Page.t) =
+  let oc = open_out (Fs.File.to_string output) in
+  let fmt = Format.formatter_of_out_channel oc in
+  let entry = mld_index_entry page.name page.content in
+  Format.fprintf fmt "%s" entry;
   close_out oc;
-;;
+

@@ -8,7 +8,7 @@ module Depends = Depends
 
 module Html = Html
 
-module Elasticsearch_index = Elasticsearch_index
+module Search_index = Search_index
 
 (**/**)
 
