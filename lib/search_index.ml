@@ -67,7 +67,7 @@ let mld_index_entry id doc =
   let url = package ^ "/index.html" in
   String.concat ~sep:"\n" [ url; package; full_name id; html_string doc ]
 
-let rec print_class_signature nearest_id
+let rec print_class_signature_entries nearest_id
           (class_signature : 'a DocOckTypes.ClassSignature.t) fmt =
   List.iter class_signature.items ~f:(fun i ->
     match i with
@@ -75,91 +75,99 @@ let rec print_class_signature nearest_id
         Format.fprintf fmt "%s" (index_entry m.id m.doc)
     | InstanceVariable iv ->
         Format.fprintf fmt "%s" (index_entry iv.id iv.doc)
+    | Constraint _ -> ()
     | Inherit cte -> begin
         match cte with
-        | Constr _ -> ignore ()
-        | Signature cs -> print_class_signature nearest_id cs fmt
-      end
-    | Comment c -> begin
-        match c with
-        | Documentation doc -> Format.fprintf fmt "%s" (index_entry nearest_id doc)
-        | Stop -> ignore ()
-      end
-    | _ -> ignore ()
-  )
-
-let rec print_index_entries signature nearest_id fmt =
-  let open DocOckTypes.Signature in
-  List.iter signature ~f:(fun i ->
-    let dots = "\n...\n" in
-    Format.fprintf fmt "%s" dots;
-    match i with
-    | Module m -> begin
-        Format.fprintf fmt "%s" (index_entry m.id m.doc);
-        let expansion = match m.expansion with
-          | Some AlreadyASig ->
-            begin match m.type_ with
-            | ModuleType (DocOckTypes.ModuleType.Signature sg) ->
-                DocOckTypes.Module.Signature sg
-            | _ -> failwith "TODO"
-            end
-          | Some e -> e
-          | None -> AlreadyASig
-        in
-        match expansion with
-        | Signature s -> print_index_entries s m.id fmt
-        | AlreadyASig -> ignore ()
-        | Functor (_, si) -> print_index_entries si m.id fmt
-      end
-    | ModuleType mt -> Format.fprintf fmt "%s" (index_entry mt.id mt.doc);
-    | Type t -> Format.fprintf fmt "%s" (index_entry t.id t.doc);
-    | TypExt te -> begin
-        List.iter te.constructors
-          ~f:(fun (c : 'a DocOckTypes.Extension.Constructor.t) ->
-            Format.fprintf fmt "%s" (index_entry c.id c.doc);
-          )
-      end
-    | Exception e ->
-      begin
-        Format.fprintf fmt "%s" (index_entry e.id e.doc);
-        match e.args with
-        | Tuple _ -> ignore ()
-        | Record field_list -> begin
-            List.iter field_list
-              ~f:(fun (fld : 'a DocOckTypes.TypeDecl.Field.t) ->
-                Format.fprintf fmt "%s" (index_entry fld.id fld.doc)
-              )
-          end
-      end
-    | Value v -> Format.fprintf fmt "%s" (index_entry v.id v.doc);
-    | External e -> Format.fprintf fmt "%s" (index_entry e.id e.doc);
-    | Class c -> begin
-        Format.fprintf fmt "%s" (index_entry c.id c.doc);
-        match c.expansion with
-          | Some cs -> print_class_signature c.id cs fmt
-          | None -> ignore ()
-      end
-    | ClassType ct -> begin
-        Format.fprintf fmt "%s" (index_entry ct.id ct.doc);
-        begin match ct.expansion with
-        | Some cs -> print_class_signature ct.id cs fmt
-        | None -> ignore ()
-        end; (* TODO: What's this? *)
-        match ct.expr with
-        | Constr _ -> ignore ()
-        | Signature cs -> print_class_signature ct.id cs fmt
-      end
-    | Include inc -> begin
-        Format.fprintf fmt "%s" (index_entry inc.parent inc.doc);
-        print_index_entries inc.expansion.content nearest_id fmt;
+        | Constr _ -> ()
+        | Signature cs -> print_class_signature_entries nearest_id cs fmt
       end
     | Comment c -> begin
         match c with
         | Documentation doc ->
             Format.fprintf fmt "%s" (index_entry nearest_id doc)
-        | Stop -> ignore ()
+        | Stop -> ()
       end
   )
+
+let rec print_signature_entries : 'a. _ -> (_, 'a) Identifier.t -> _ -> _ =
+  fun signature nearest_id fmt ->
+    let open DocOckTypes.Signature in
+    List.iter signature ~f:(fun i ->
+      let dots = "\n...\n" in
+      Format.fprintf fmt "%s" dots;
+      match i with
+      | Module m ->
+          Format.fprintf fmt "%s" (index_entry m.id m.doc);
+          let signature =
+            match m.expansion with
+            | Some AlreadyASig -> begin
+                match m.type_ with
+                | ModuleType (Signature sg) -> sg
+                | _ -> assert false
+              end
+            | Some (Signature sg) -> sg
+            | Some (Functor(_, sg)) -> sg
+            | None -> []
+          in
+          print_signature_entries signature m.id fmt
+      | ModuleType mt ->
+          Format.fprintf fmt "%s" (index_entry mt.id mt.doc);
+          let signature =
+            match mt.expansion with
+            | Some AlreadyASig -> begin
+                match mt.expr with
+                | Some (Signature sg) -> sg
+                | _ -> assert false
+              end
+            | Some (Signature sg) -> sg
+            | Some (Functor(_, sg)) -> sg
+            | None -> []
+          in
+          print_signature_entries signature mt.id fmt
+      | Type t -> Format.fprintf fmt "%s" (index_entry t.id t.doc);
+      | TypExt te -> begin
+          List.iter te.constructors
+            ~f:(fun (c : 'a DocOckTypes.Extension.Constructor.t) ->
+              Format.fprintf fmt "%s" (index_entry c.id c.doc);
+            )
+        end
+      | Exception e ->
+        begin
+          Format.fprintf fmt "%s" (index_entry e.id e.doc);
+          match e.args with
+          | Tuple _ -> ()
+          | Record field_list -> begin
+              List.iter field_list
+                ~f:(fun (fld : 'a DocOckTypes.TypeDecl.Field.t) ->
+                  Format.fprintf fmt "%s" (index_entry fld.id fld.doc)
+                )
+            end
+        end
+      | Value v -> Format.fprintf fmt "%s" (index_entry v.id v.doc);
+      | External e -> Format.fprintf fmt "%s" (index_entry e.id e.doc);
+      | Class c -> begin
+          Format.fprintf fmt "%s" (index_entry c.id c.doc);
+          match c.expansion with
+          | Some cs -> print_class_signature_entries c.id cs fmt
+          | None -> ()
+        end
+      | ClassType ct -> begin
+          Format.fprintf fmt "%s" (index_entry ct.id ct.doc);
+          match ct.expansion with
+          | Some cs -> print_class_signature_entries ct.id cs fmt
+          | None -> ()
+        end
+      | Include inc -> begin
+          Format.fprintf fmt "%s" (index_entry inc.parent inc.doc);
+          print_signature_entries inc.expansion.content nearest_id fmt;
+        end
+      | Comment c -> begin
+          match c with
+          | Documentation doc ->
+              Format.fprintf fmt "%s" (index_entry nearest_id doc)
+          | Stop -> ()
+        end
+    )
 
 let from_unit ~output ~(unit:'a DocOck.Types.Unit.t) =
   let oc = open_out (Fs.File.to_string output) in
@@ -171,7 +179,7 @@ let from_unit ~output ~(unit:'a DocOck.Types.Unit.t) =
     | Pack _ -> failwith "TODO"
     | Module s -> s
   in
-  print_index_entries signature unit.id fmt;
+  print_signature_entries signature unit.id fmt;
   close_out oc
 
 let from_page ~output ~(page:'a DocOck.Types.Page.t) =
