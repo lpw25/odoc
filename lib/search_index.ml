@@ -70,6 +70,8 @@ let mld_index_entry id doc =
 let rec print_class_signature_entries nearest_id
           (class_signature : 'a DocOckTypes.ClassSignature.t) fmt =
   List.iter class_signature.items ~f:(fun i ->
+    let dots = "\n...\n" in
+    Format.fprintf fmt "%s" dots;
     match i with
     | DocOckTypes.ClassSignature.Method m ->
         Format.fprintf fmt "%s" (index_entry m.id m.doc)
