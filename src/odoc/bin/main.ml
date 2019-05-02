@@ -122,10 +122,10 @@ end = struct
       in
       Fs.File.(set_ext ".odoc" output)
 
-  let compile hidden directories resolve_fwd_refs dst package_name input
-      warn_error =
+  let compile hidden directories resolve_fwd_refs dst package_name open_modules input warn_error =
+    let directories = Fs.Directory.of_string "/Users/jon/.opam/4.09.0/lib/ocaml" :: directories in
     let env =
-      Env.create ~important_digests:(not resolve_fwd_refs) ~directories
+      Env.create ~important_digests:(not resolve_fwd_refs) ~directories ~open_modules
     in
     let input = Fs.File.of_string input in
     let output = output_file ~dst ~input in
@@ -154,6 +154,12 @@ end = struct
     in
     Arg.(value & opt (some string) None & info ~docs ~docv:"PATH" ~doc ["o"])
 
+  let open_modules =
+    let doc = "Initially open module. Can be used more than once" in
+    let default = []
+    in
+    Arg.(value & opt_all string default & info ~docv:"MODULE" ~doc ["open"])
+
   let cmd =
     let pkg =
       let doc = "Package the input is part of" in
@@ -165,7 +171,7 @@ end = struct
       Arg.(value & flag & info ~doc ["r";"resolve-fwd-refs"])
     in
     Term.(const handle_error $ (const compile $ hidden $ odoc_file_directories $
-          resolve_fwd_refs $ dst $ pkg $ input $ warn_error))
+          resolve_fwd_refs $ dst $ pkg $ open_modules $ input $ warn_error))
 
   let info =
     Term.info "compile"
@@ -209,9 +215,10 @@ end = struct
 
   let html semantic_uris closed_details _hidden directories output_dir index_for
         syntax theme_uri input_file warn_error =
+    let directories = Fs.Directory.of_string "/Users/jon/.opam/4.09.0/lib/ocaml" :: directories in
     Odoc_html.Tree.Relative_link.semantic_uris := semantic_uris;
     Odoc_html.Tree.open_details := not closed_details;
-    let env = Env.create ~important_digests:false ~directories in
+    let env = Env.create ~important_digests:false ~directories ~open_modules:[] in
     let file = Fs.File.of_string input_file in
     match index_for with
     | None ->
@@ -270,7 +277,7 @@ module Html_fragment : sig
 end = struct
 
   let html_fragment directories xref_base_uri output_file input_file warn_error =
-    let env = Env.create ~important_digests:false ~directories in
+    let env = Env.create ~important_digests:false ~directories ~open_modules:[] in
     let input_file = Fs.File.of_string input_file in
     let output_file = Fs.File.of_string output_file in
     let xref_base_uri =
@@ -374,7 +381,7 @@ module Targets = struct
   module Odoc_html = struct
     let list_targets directories output_dir odoc_file =
       let open Or_error in
-      let env = Env.create ~important_digests:false ~directories in
+      let env = Env.create ~important_digests:false ~directories ~open_modules:[] in
       let odoc_file = Fs.File.of_string odoc_file in
       Targets.of_odoc_file ~env ~output:output_dir odoc_file >>= fun targets ->
       let targets = List.map ~f:Fs.File.to_string targets in

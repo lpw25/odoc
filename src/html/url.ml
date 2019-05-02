@@ -78,15 +78,24 @@ let rec from_identifier : stop_before:bool ->
         { page = parent; anchor = Printf.sprintf "%s-%s" kind (ModuleName.to_string mod_name); kind }
       else
         { page = (ModuleName.to_string mod_name) :: parent; anchor = ""; kind }
-    | `Argument (functor_id, arg_num, arg_name) ->
-      from_identifier_no_anchor (functor_id :> Identifier.t) ("arg " ^ ArgumentName.to_string arg_name)
+    | `Parameter (functor_id, arg_name) ->
+      let rec argument_number i =
+        function
+        | `Result x -> argument_number (i+1) x
+        | `Module _ -> i
+        | `ModuleType _ -> i
+        | _ -> failwith "Invalid assumptions!"
+      in
+      let arg_num = argument_number 1 functor_id in
+      from_identifier_no_anchor (functor_id :> Identifier.t) ("arg " ^ ParameterName.to_string arg_name)
       >>| fun parent ->
       let kind = "argument" in
-      let suffix = Printf.sprintf "%s-%d-%s" kind arg_num (ArgumentName.to_string arg_name) in
+      let suffix = Printf.sprintf "%s-%d-%s" kind arg_num (ParameterName.to_string arg_name) in
       if stop_before then
         { page = parent; anchor = suffix; kind }
       else
         { page = suffix :: parent; anchor = ""; kind }
+    | `Result p -> from_identifier ~stop_before (p :> Identifier.t)
     | `ModuleType (parent, modt_name) ->
       from_identifier_no_anchor (parent :> Identifier.t) ("module type " ^ ModuleTypeName.to_string modt_name)
       >>| fun parent ->
@@ -214,6 +223,7 @@ let render_path : Odoc_model.Paths.Path.t -> string =
     | `Type (p, s) -> render_resolved (p :> t) ^ "." ^ (TypeName.to_string s)
     | `Class (p, s) -> render_resolved (p :> t) ^ "." ^ (ClassName.to_string s)
     | `ClassType (p, s) -> render_resolved (p :> t) ^ "." ^ (ClassTypeName.to_string s)
+    | `Alias (_, p) -> render_resolved (p :> t)
   and render_path : Odoc_model.Paths.Path.t -> string =
     function
     | `Root root -> root

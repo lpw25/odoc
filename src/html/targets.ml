@@ -17,13 +17,8 @@
 open StdLabels
 open Odoc_model.Paths
 
-let functor_arg_pos { Odoc_model.Lang.FunctorParameter.id ; _ } =
-  match id with
-  | `Argument (_, nb, _) -> nb
-  | _ ->
-    failwith "TODO"
-    (* let id = string_of_sexp @@ Identifier.sexp_of_t id in
-    invalid_arg (Printf.sprintf "functor_arg_pos: %s" id) *)
+
+let functor_arg_pos = Generator.functor_arg_pos 
 
 let rec unit ~package (t : Odoc_model.Lang.Compilation_unit.t) : string list =
   let name = Printf.sprintf "%s/%s" package (Identifier.name t.id) in

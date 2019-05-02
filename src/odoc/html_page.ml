@@ -32,8 +32,10 @@ let from_odoc ~env ?(syntax=Odoc_html.Tree.OCaml) ?theme_uri ~output:root_dir in
   match root.file with
   | Page page_name ->
     Page.load input >>= fun page ->
-    let resolve_env = Env.build env (`Page page) in
-    Odoc_xref.resolve_page (Env.resolver resolve_env) page >>= fun odoctree ->
+    let odoctree =
+      let resolve_env = Env.build env (`Page page) in
+      Odoc_xref2.Resolve2.resolve_page resolve_env page
+    in
     let pkg_name = root.package in
     let pages = to_html_tree_page ?theme_uri ~syntax odoctree in
     let pkg_dir = Fs.Directory.reach_from ~dir:root_dir pkg_name in
@@ -48,21 +50,26 @@ let from_odoc ~env ?(syntax=Odoc_html.Tree.OCaml) ?theme_uri ~output:root_dir in
       Format.fprintf fmt "%a@?" (Tyxml.Html.pp ()) content;
       close_out oc
     );
+    Printf.fprintf stderr "num_times: %d\n%!" !Odoc_xref2.Tools.num_times;
     Ok ()
   | Compilation_unit {hidden = _; _} ->
     (* If hidden, we should not generate HTML. See
          https://github.com/ocaml/odoc/issues/99. *)
     Compilation_unit.load input >>= fun unit ->
-    let unit = Odoc_xref.Lookup.lookup unit in
-    begin
-      (* See comment in compile for explanation regarding the env duplication. *)
-      let resolve_env = Env.build env (`Unit unit) in
-      Odoc_xref.resolve (Env.resolver resolve_env) unit >>= fun resolved ->
-      let expand_env = Env.build env (`Unit resolved) in
-      Odoc_xref.expand (Env.expander expand_env) resolved >>= fun expanded ->
-      Odoc_xref.Lookup.lookup expanded
-      |> Odoc_xref.resolve (Env.resolver expand_env) (* Yes, again. *)
-    end >>= fun odoctree ->
+(*    let unit = Odoc_xref.Lookup.lookup unit in *)
+    let odoctree =
+      let env = Env.build env (`Unit unit) in
+      let startresolve = Unix.gettimeofday () in
+      Format.fprintf Format.err_formatter "**** Resolve2...\n%!";
+      let resolved = Odoc_xref2.Resolve2.resolve env unit in
+      let startexpand = Unix.gettimeofday () in
+      Format.fprintf Format.err_formatter "**** Expand...\n%!";
+      let expanded = Odoc_xref2.Expand.expand2 env resolved in
+      let finishexpand = Unix.gettimeofday () in
+      Format.fprintf Format.err_formatter "**** Finished: Resolve=%f Expand=%f\n%!" (startexpand -. startresolve) (finishexpand -. startexpand);
+      Printf.fprintf stderr "num_times: %d\n%!" !Odoc_xref2.Tools.num_times;
+      expanded
+    in
     let pkg_dir =
       Fs.Directory.reach_from ~dir:root_dir root.package
     in
@@ -111,9 +118,9 @@ let from_mld ~env ?(syntax=Odoc_html.Tree.OCaml) ~package ~output:root_dir ~warn
   let to_html content =
     (* This is a mess. *)
     let page = Odoc_model.Lang.Page.{ name; content; digest } in
-    let page = Odoc_xref.Lookup.lookup_page page in
+(*    let page = Odoc_xref.Lookup.lookup_page page in*)
     let env = Env.build env (`Page page) in
-    Odoc_xref.resolve_page (Env.resolver env) page >>= fun resolved ->
+    let resolved = Odoc_xref2.Resolve.resolve_page env page in
     let pages = to_html_tree_page ~syntax resolved in
     let pkg_dir = Fs.Directory.reach_from ~dir:root_dir root.package in
     Fs.Directory.mkdir_p pkg_dir;

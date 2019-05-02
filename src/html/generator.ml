@@ -21,17 +21,19 @@ module Paths = Odoc_model.Paths
 
 open Utils
 
-
+let functor_arg_pos { Odoc_model.Lang.FunctorParameter.id ; _ } =
+  let rec inner = function
+    | `Parameter (p, _) -> inner_sig p
+    | _ -> failwith "Invalid assumptions (1)"
+  and inner_sig = function
+    | `Result p -> 1 + inner_sig p
+    | `Module _ -> 1
+    | `ModuleType _ -> 1
+    | `Root _
+    | `Parameter _ -> failwith "Invalid assumptions (2)"
+  in inner id
 
 let a_href = Tree.Relative_link.to_sub_element
-
-let functor_arg_pos { Odoc_model.Lang.FunctorParameter.id ; _ } =
-  match id with
-  | `Argument (_, nb, _) -> nb
-  | _ ->
-    failwith "TODO"
-    (* let id = string_of_sexp @@ Identifier.sexp_of_t id in
-    invalid_arg (Printf.sprintf "functor_arg_pos: %s" id) *)
 
 let label = function
   | Odoc_model.Lang.TypeExpr.Label s -> [ Html.txt s ]
