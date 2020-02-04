@@ -26,7 +26,7 @@ let from_mld ~xref_base_uri ~env ~output ~warn_error input =
     (* This is a mess. *)
     let page = Odoc_model.Lang.Page.{ name; content; digest } in
     let env = Env.build env (`Page page) in
-    let resolved = Odoc_xref2.Resolve.resolve_page env page in
+    let resolved = Odoc_xref2.Link.resolve_page env page in
 
     let content = Odoc_html.Comment.to_html ~xref_base_uri resolved.content in
     let oc = open_out (Fs.File.to_string output) in

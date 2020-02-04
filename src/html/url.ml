@@ -84,7 +84,8 @@ let rec from_identifier : stop_before:bool ->
         | `Result x -> argument_number (i+1) x
         | `Module _ -> i
         | `ModuleType _ -> i
-        | _ -> failwith "Invalid assumptions!"
+        | `Parameter _ -> i
+        | `Root _ -> i
       in
       let arg_num = argument_number 1 functor_id in
       from_identifier_no_anchor (functor_id :> Identifier.t) ("arg " ^ ParameterName.to_string arg_name)
@@ -223,7 +224,10 @@ let render_path : Odoc_model.Paths.Path.t -> string =
     | `Type (p, s) -> render_resolved (p :> t) ^ "." ^ (TypeName.to_string s)
     | `Class (p, s) -> render_resolved (p :> t) ^ "." ^ (ClassName.to_string s)
     | `ClassType (p, s) -> render_resolved (p :> t) ^ "." ^ (ClassTypeName.to_string s)
-    | `Alias (_, p) -> render_resolved (p :> t)
+    | `Alias (p1, p2) ->
+      if Odoc_model.Paths.Path.is_hidden (`Resolved (p2 :> t))
+      then render_resolved (p1 :> t)
+      else render_resolved (p2 :> t)
   and render_path : Odoc_model.Paths.Path.t -> string =
     function
     | `Root root -> root
