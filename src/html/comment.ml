@@ -37,6 +37,7 @@ module Reference = struct
       let open Reference.Resolved in
       match r with
       | `Identifier id -> Identifier.name id
+      | `Hidden p -> render_resolved (p :> t)
       | `SubstAlias(_, r) -> render_resolved (r :> t)
       | `Module (r, s) -> render_resolved (r :> t) ^ "." ^ (ModuleName.to_string s)
       | `Canonical (_, `Resolved r) -> render_resolved (r :> t)
