@@ -1792,11 +1792,7 @@ struct
   and include_ heading_level_shift ?theme_uri (t : Odoc_model.Lang.Include.t) =
     let docs = Comment.to_html t.doc in
     let docs = (docs :> (Html_types.div_content Html.elt) list) in
-    let should_be_inlined =
-      let is_inline_tag element =
-        element.Odoc_model.Location_.value = `Tag `Inline in
-      List.exists is_inline_tag t.doc
-    in
+    let should_be_inlined = t.inline in
     let included_html, toc, tree =
       let heading_level_shift =
         if should_be_inlined then
