@@ -1512,6 +1512,7 @@ struct
     let name = Paths.Identifier.name arg.id in
     let nb = functor_arg_pos arg in
     let link_name = Printf.sprintf "%d-%s" nb name in
+    let render_ty = match arg.display_expr with | Some e -> e | None -> arg.expr in
     let def_div, subtree =
       match arg.expansion with
       | None ->
@@ -1538,7 +1539,7 @@ struct
         (
           Html.a ~a:[ a_href ~kind:`Arg link_name ] [Html.txt name] ::
           Html.txt Syntax.Type.annotation_separator ::
-          mty (arg.id :> Paths.Identifier.Signature.t) arg.expr
+          mty (arg.id :> Paths.Identifier.Signature.t) render_ty
         ), [subtree]
     in
     let region = [Html.code def_div] in
@@ -1725,9 +1726,10 @@ struct
         | exception _ -> to_print
         | href -> Html.a ~a:[ Html.a_href href ] [ to_print ]
       in
+      let render_ty = match arg.display_expr with | Some e -> e | None -> arg.expr in
       (if Syntax.Mod.functor_keyword then [keyword "functor"] else []) @
       Html.txt " (" :: name :: Html.txt Syntax.Type.annotation_separator ::
-      mty base arg.expr @
+      mty base render_ty @
       [Html.txt ")"; Html.txt " "] @ Syntax.Type.arrow :: Html.txt " " ::
       mty base expr
     | With (expr, substitutions) ->
