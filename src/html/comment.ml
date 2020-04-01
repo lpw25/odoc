@@ -85,11 +85,10 @@ module Reference = struct
   let rec to_html
       : ?text:(non_link_phrasing Html.elt) ->
         ?xref_base_uri:string ->
-        stop_before:bool ->
         Reference.t ->
         phrasing Html.elt =
 
-    fun ?text ?xref_base_uri ~stop_before ref ->
+    fun ?text ?xref_base_uri ref ->
       let span' (txt : phrasing Html.elt list) : phrasing Html.elt =
         Html.span txt ~a:[ Html.a_class ["xref-unresolved"]
                   ; Html.a_title (Printf.sprintf "unresolved reference to %S"
@@ -139,7 +138,7 @@ module Reference = struct
           | None -> Html.code [Html.txt (render_resolved r)]
           | Some s -> s
         in
-        begin match Id.href ?xref_base_uri ~stop_before id with
+        begin match Id.href ~stop_before:false ?xref_base_uri id with
         | exception Id.Not_linkable -> (txt :> phrasing Html.elt)
         | exception exn ->
           (* FIXME: better error message *)
@@ -162,7 +161,7 @@ module Reference = struct
       | None ->
         let tail = [ Html.txt ("." ^ s) ] in
         span' (
-          match to_html ?xref_base_uri ~stop_before:true parent with
+          match to_html ?xref_base_uri parent with
           | content -> content::tail
         )
 end
@@ -228,7 +227,7 @@ let rec inline_element ?xref_base_uri : Comment.inline_element -> (phrasing Html
       | [] -> None
       | _ -> Some (Html.span (non_link_inline_element_list content))
     in
-    Some (Reference.to_html ?text:content ?xref_base_uri ~stop_before:false path)
+    Some (Reference.to_html ?text:content ?xref_base_uri path)
   | `Link (target, content) ->
     let content =
       match content with
@@ -280,7 +279,7 @@ let rec nestable_block_element
     Html.pre [Html.code ~a:[Html.a_class [classname]] [Html.txt code]]
   | `Verbatim s -> Html.pre [Html.txt s]
   | `Modules ms ->
-    let items = List.map (Reference.to_html ?xref_base_uri ~stop_before:false) (ms :> Odoc_model.Paths.Reference.t list)  in
+    let items = List.map (Reference.to_html ?xref_base_uri) (ms :> Odoc_model.Paths.Reference.t list)  in
     let items = (items :> (Html_types.li_content Html.elt) list) in
     let items = List.map (fun e -> Html.li [e]) items in
     Html.ul ~a:[Html.a_class ["modules"]] items

@@ -66,9 +66,8 @@ module Relative_link = struct
 
   module Id : sig
     exception Not_linkable
-    exception Can't_stop_before
 
-    val href : ?xref_base_uri:string -> stop_before:bool -> Identifier.t -> string
+    val href : stop_before:bool -> ?xref_base_uri:string -> Identifier.t -> string
   end = struct
     exception Not_linkable
 
@@ -78,9 +77,7 @@ module Relative_link = struct
         drop_shared_prefix l1s l2s
       | _, _ -> l1, l2
 
-    exception Can't_stop_before
-
-    let href ?xref_base_uri ~stop_before id =
+    let href ~stop_before ?xref_base_uri id =
       match xref_base_uri, Url.from_identifier ~stop_before id with
       (* If xref_base_uri is defined, do not perform relative URI resolution. *)
       | Some xref_base_uri, Ok { Url. page; anchor; kind } ->
@@ -140,19 +137,25 @@ module Relative_link = struct
   end
 
   module Of_path = struct
-    let rec to_html : stop_before:bool -> Path.t -> _ =
-      fun ~stop_before path ->
+    let rec to_html : Path.t -> _ =
+      fun path ->
         match path with
         | `Root root -> [ Html.txt root ]
         | `Forward root -> [ Html.txt root ] (* FIXME *)
         | `Dot (prefix, suffix) ->
-          let link = to_html ~stop_before:true (prefix :> Path.t) in
+          let link = to_html (prefix :> Path.t) in
           link @ [ Html.txt ("." ^ suffix) ]
         | `Apply (p1, p2) ->
-          let link1 = to_html ~stop_before (p1 :> Path.t) in
-          let link2 = to_html ~stop_before (p2 :> Path.t) in
+          let link1 = to_html (p1 :> Path.t) in
+          let link2 = to_html (p2 :> Path.t) in
           link1 @ Html.txt "(":: link2 @ [ Html.txt ")" ]
         | `Resolved rp ->
+          let stop_before =
+            match rp with
+            | `OpaqueModule _
+            | `OpaqueModuleType _ -> true
+            | _ -> false
+          in
           let id = Path.Resolved.identifier rp in
           let txt = Url.render_path path in
           begin match Id.href ~stop_before id with
@@ -188,7 +191,7 @@ module Relative_link = struct
         | `Type (rr, s) -> dot (render_resolved (rr :> t)) (TypeName.to_string s)
         | `Class (rr, s) -> dot (render_resolved ( rr :> t)) (ClassName.to_string s)
         | `ClassType (rr, s) -> dot (render_resolved (rr :> t)) (ClassTypeName.to_string s)
-
+        | `OpaqueModule m -> render_resolved (m :> t)
     (* let rec pp_resolved_frag ppf (f : Fragment.Resolved.t) =
       let open Fragment.Resolved in
       match f with
@@ -268,14 +271,14 @@ module Relative_link = struct
             name
       | `Page (_, name) -> Format.fprintf ppf "%s" name
    *)
-    let rec to_html : stop_before:bool ->
+    let rec to_html :
       Identifier.Signature.t -> Fragment.t -> _ =
-      fun ~stop_before id fragment ->
+      fun id fragment ->
         let open Fragment in
         match fragment with
         | `Resolved (`Root _)
         | `Root ->
-          begin match Id.href ~stop_before:true (id :> Identifier.t) with
+          begin match Id.href ~stop_before:false (id :> Identifier.t) with
           | href ->
             [Html.a ~a:[Html.a_href href] [Html.txt (Identifier.name id)]]
           | exception Id.Not_linkable -> [ Html.txt (Identifier.name id) ]
@@ -286,7 +289,11 @@ module Relative_link = struct
         | `Resolved rr ->
           let id = Resolved.identifier (rr :> Resolved.t) in
           let txt = render_resolved rr in
-
+          let stop_before =
+            match rr with 
+            | `OpaqueModule _ -> true
+            | _ -> false
+          in
           (* Format.fprintf Format.err_formatter "Formatting resolved fragment: %s %a %a\n%!" txt pp_resolved_frag (rr :> Resolved.t) model_identifier id; *)
           begin match Id.href ~stop_before id with
           | href ->
@@ -297,15 +304,15 @@ module Relative_link = struct
             [ Html.txt txt ]
           end
         | `Dot (prefix, suffix) ->
-          let link = to_html ~stop_before:true id (prefix :> Fragment.t) in
+          let link = to_html id (prefix :> Fragment.t) in
           link @ [ Html.txt ("." ^ suffix) ]
   end
 
-  let of_path ~stop_before p =
-    Of_path.to_html ~stop_before p
+  let of_path p =
+    Of_path.to_html p
 
   let of_fragment ~base frag =
-    Of_fragment.to_html ~stop_before:true base frag
+    Of_fragment.to_html base frag
 
   let to_sub_element ~kind name =
     (* FIXME: Reuse [Url]. *)

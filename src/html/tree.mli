@@ -72,10 +72,10 @@ module Relative_link : sig
   module Id : sig
     exception Not_linkable
 
-    val href : ?xref_base_uri:string -> stop_before:bool -> Paths.Identifier.t -> string
+    val href : stop_before:bool -> ?xref_base_uri:string  -> Paths.Identifier.t -> string
   end
 
-  val of_path : stop_before:bool -> Paths.Path.t
+  val of_path : Paths.Path.t
     -> [> `A of [> `PCDATA ] | `PCDATA ] Html.elt list
 
   val of_fragment : base:Paths.Identifier.Signature.t

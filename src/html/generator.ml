@@ -213,19 +213,19 @@ struct
       else
         res
     | Constr (path, args) ->
-      let link = Tree.Relative_link.of_path ~stop_before:false (path :> Paths.Path.t) in
+      let link = Tree.Relative_link.of_path (path :> Paths.Path.t) in
       format_type_path ~delim:(`parens) args link
     | Polymorphic_variant v -> te_variant v
     | Object o -> te_object o
     | Class (path, args) ->
       format_type_path ~delim:(`brackets) args
-        (Tree.Relative_link.of_path ~stop_before:false (path :> Paths.Path.t))
+        (Tree.Relative_link.of_path (path :> Paths.Path.t))
     | Poly (polyvars, t) ->
       Html.txt (String.concat " " polyvars ^ ". ") :: type_expr t
     | Package pkg ->
       [enclose ~l:"(" ~r:")" (
          keyword "module" :: Html.txt " " ::
-         Tree.Relative_link.of_path ~stop_before:false
+         Tree.Relative_link.of_path
            (pkg.path :> Paths.Path.t) @
          match pkg.substitutions with
          | [] -> []
@@ -423,7 +423,7 @@ struct
       Html.code (
         keyword "type" ::
         Html.txt " " ::
-        Tree.Relative_link.of_path ~stop_before:false (t.type_path :> Paths.Path.t) @
+        Tree.Relative_link.of_path (t.type_path :> Paths.Path.t) @
         [ Html.txt " += " ]
       ) ::
       list_concat_map t.constructors ~sep:(Html.code [Html.txt " | "])
@@ -690,7 +690,7 @@ end =
 struct
   let module_substitution (t : Odoc_model.Lang.ModuleSubstitution.t) =
     let name = Paths.Identifier.name t.id in
-    let path = Tree.Relative_link.of_path ~stop_before:true (t.manifest :> Paths.Path.t) in
+    let path = Tree.Relative_link.of_path (t.manifest :> Paths.Path.t) in
     let value =
       keyword "module" ::
       Html.txt " " ::
@@ -1203,7 +1203,7 @@ end
 (* TODO Figure out when this function would fail. It is currently pasted from
    [make_def], but the [make_spec] version doesn't have a [failwith]. *)
 let path_to_id path =
-  match Url.from_identifier ~stop_before:true path with
+  match Url.from_identifier ~stop_before:false path with
   | Error _ ->
     None
   | Ok {anchor; _} ->
@@ -1311,7 +1311,7 @@ struct
   and class_type_expr (cte : Odoc_model.Lang.ClassType.expr) =
     match cte with
     | Constr (path, args) ->
-      let link = Tree.Relative_link.of_path ~stop_before:false (path :> Paths.Path.t) in
+      let link = Tree.Relative_link.of_path (path :> Paths.Path.t) in
       format_type_path ~delim:(`brackets) args link
     | Signature _ ->
       [
@@ -1649,7 +1649,7 @@ struct
     : Paths.Identifier.Signature.t -> Odoc_model.Lang.Module.decl -> text =
     fun base -> function
     | Alias mod_path ->
-      Tree.Relative_link.of_path ~stop_before:true (mod_path :> Paths.Path.t)
+      Tree.Relative_link.of_path (mod_path :> Paths.Path.t)
     | ModuleType mt -> mty (extract_path_from_mt ~default:base mt) mt
 
   and module_type ?theme_uri (t : Odoc_model.Lang.ModuleType.t) =
@@ -1704,7 +1704,7 @@ struct
     : Paths.Identifier.Signature.t -> Odoc_model.Lang.ModuleType.expr -> text
   = fun base -> function
     | Path mty_path ->
-      Tree.Relative_link.of_path ~stop_before:true (mty_path :> Paths.Path.t)
+      Tree.Relative_link.of_path (mty_path :> Paths.Path.t)
     | Signature _ ->
       [
         Syntax.Mod.open_tag;
@@ -1720,8 +1720,7 @@ struct
         let open Odoc_model.Lang.FunctorParameter in
         let to_print = Html.txt @@ Paths.Identifier.name arg.id in
         match
-          Tree.Relative_link.Id.href
-            ~stop_before:(arg.expansion = None) (arg.id :> Paths.Identifier.t)
+          Tree.Relative_link.Id.href ~stop_before:false (arg.id :> Paths.Identifier.t)
         with
         | exception _ -> to_print
         | href -> Html.a ~a:[ Html.a_href href ] [ to_print ]
@@ -1776,7 +1775,7 @@ struct
       Tree.Relative_link.of_fragment
         ~base (frag_mod :> Paths.Fragment.t) @
       Html.txt " := " ::
-      Tree.Relative_link.of_path ~stop_before:true (mod_path :> Paths.Path.t)
+      Tree.Relative_link.of_path (mod_path :> Paths.Path.t)
     | TypeSubst (frag_typ, td) ->
       keyword "type" ::
       Html.txt " " ::
@@ -1866,7 +1865,7 @@ struct
         Html.txt " " ::
         Html.txt modname ::
         Html.txt " = " ::
-        Tree.Relative_link.of_path ~stop_before:false (x.path :> Paths.Path.t)
+        Tree.Relative_link.of_path (x.path :> Paths.Path.t)
       in
       [Html.code md_def]
     end
