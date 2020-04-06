@@ -1203,7 +1203,7 @@ end
 (* TODO Figure out when this function would fail. It is currently pasted from
    [make_def], but the [make_spec] version doesn't have a [failwith]. *)
 let path_to_id path =
-  match Url.from_identifier ~stop_before:false path with
+  match Url.from_identifier ~stop_before:true path with
   | Error _ ->
     None
   | Ok {anchor; _} ->
