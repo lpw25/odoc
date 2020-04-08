@@ -350,7 +350,7 @@ and process_module_path env add_canonical m p =
   in
   let p'' = if add_canonical then add_canonical_path env m p' else p' in
   try
-    ignore (signature_of_module env m);
+    ignore (signature_of_module_cached env p'' false m);
     p''
   with
   | OpaqueModule -> `OpaqueModule p''
@@ -676,7 +676,7 @@ and lookup_and_resolve_module_type_from_path :
     | `Resolved r ->
         let m = lookup_module_type env r in
         let p' = process_module_type env m r in
-        return (p', lookup_module_type env r)
+        return (p', m)
     | `Substituted s ->
         lookup_and_resolve_module_type_from_path is_resolve env s
         |> map_unresolved (fun p' -> `Substituted p')
