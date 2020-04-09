@@ -1392,14 +1392,24 @@ module Make (Syntax : SYNTAX) = struct
     let tag_signature_item : Lang.Signature.item -> _ =
      fun item ->
       match item with
-      | Type _ -> Some (`Leaf_item (`Type, item))
+      | Type (_, t) -> (
+          match t.id with
+          | `Type (_, name) when Odoc_model.Names.TypeName.is_internal name ->
+              None
+          | _ -> Some (`Leaf_item (`Type, item)) )
       | TypeSubstitution _ -> Some (`Leaf_item (`TypeSubstitution, item))
       | TypExt _ -> Some (`Leaf_item (`Extension, item))
       | Exception _ -> Some (`Leaf_item (`Exception, item))
       | Value _ -> Some (`Leaf_item (`Value, item))
       | External _ -> Some (`Leaf_item (`External, item))
       | ModuleSubstitution _ -> Some (`Leaf_item (`ModuleSubstitution, item))
-      | Module _ | ModuleType _ | Include _ | Class _ | ClassType _ ->
+      | Module (_, m) -> (
+          match m.id with
+          | `Module (_, name) when Odoc_model.Names.ModuleName.is_internal name
+            ->
+              None
+          | _ -> Some (`Nested_article item) )
+      | ModuleType _ | Include _ | Class _ | ClassType _ ->
           Some (`Nested_article item)
       | Comment comment -> Some (`Comment comment)
       | Open _ -> None
@@ -1657,15 +1667,24 @@ module Make (Syntax : SYNTAX) = struct
           (if Syntax.Mod.functor_keyword then [ keyword "functor" ] else [])
           @ (Html.txt " () " :: mty base expr)
       | Functor (Named arg, expr) ->
+          (* If the expr is a path to an opaque module type, we don't make
+             a link *)
+          let mklink =
+            match expr with
+            | Lang.ModuleType.Path (`Resolved (`OpaqueModuleType _)) -> false
+            | _ -> true
+          in
           let name =
-            let open Odoc_model.Lang.FunctorParameter in
-            let to_print = Html.txt @@ Paths.Identifier.name arg.id in
-            match
-              Tree.Relative_link.Id.href ~stop_before:false
-                (arg.id :> Paths.Identifier.t)
-            with
-            | exception _ -> to_print
-            | href -> Html.a ~a:[ Html.a_href href ] [ to_print ]
+            if mklink then
+              let open Odoc_model.Lang.FunctorParameter in
+              let to_print = Html.txt @@ Paths.Identifier.name arg.id in
+              match
+                Tree.Relative_link.Id.href ~stop_before:false
+                  (arg.id :> Paths.Identifier.t)
+              with
+              | exception _ -> to_print
+              | href -> Html.a ~a:[ Html.a_href href ] [ to_print ]
+            else Html.txt @@ Paths.Identifier.name arg.id
           in
           let render_ty =
             match arg.display_expr with Some e -> e | None -> arg.expr
