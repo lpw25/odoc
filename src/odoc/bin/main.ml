@@ -514,7 +514,7 @@ end
 
 let () =
   Printexc.record_backtrace true;
-
+  Memtrace.trace_if_requested ();
   let subcommands =
     [ Compile.(cmd, info)
     ; Odoc_html.(cmd, info)
